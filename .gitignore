@@ -1,0 +1,27 @@
+# Secrets – API key(s) for the container (see README, "Access protection")
+secrets/
+.env
+.env.*
+
+# Images to check (mounted read-only into the container); keep only the folder itself
+images/*
+!images/.gitkeep
+
+# Test images created by `python -m tests.make_test_images`
+test_images/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

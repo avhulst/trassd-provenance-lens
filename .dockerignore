@@ -1,0 +1,13 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+tests
+test_images
+*.md
+!README.md
+.DS_Store
+secrets
+images

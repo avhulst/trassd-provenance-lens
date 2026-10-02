@@ -1,0 +1,11 @@
+# Runtime dependencies. invisible-watermark is installed separately with --no-deps
+# (see Dockerfile) so that PyTorch is not pulled in.
+fastapi==0.142.2
+uvicorn==0.54.0
+python-multipart==0.0.32
+pillow==12.3.0
+c2pa-python==0.38.0
+numpy==2.5.3
+opencv-python-headless==5.0.0.93
+PyWavelets==1.10.0
+mcp==2.2.0
