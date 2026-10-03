@@ -3,7 +3,7 @@
 Two transports:
 
 - **stdio** – ``python -m app.mcp_server``; the client starts the process itself
-  (e.g. ``docker run -i --rm ... ki-pruefer python -m app.mcp_server``).
+  (e.g. ``docker run -i --rm ... trassd-provenance-lens python -m app.mcp_server``).
 - **Streamable HTTP** – mounted into the FastAPI app at ``/mcp`` (see ``app.main``),
   protected by the same ``API_KEY`` as the REST API.
 
@@ -91,7 +91,7 @@ def resolve_image_path(path: str) -> Path:
 
 def build_server() -> MCPServer:
     server = MCPServer(
-        name="ki-pruefer",
+        name="trassd-provenance-lens",
         title="AI Label Checker",
         instructions=INSTRUCTIONS,
         version=__version__,

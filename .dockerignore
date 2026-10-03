@@ -11,3 +11,5 @@ test_images
 .DS_Store
 secrets
 images
+.github
+requirements-dev.txt

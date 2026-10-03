@@ -1,0 +1,130 @@
+# Publishes the image to Docker Hub when a GitHub release is published.
+#
+# Release tag v1.2.3 → avhulst2/trassd-provenance-lens:1.2.3, :1.2, :1 and :latest
+# (pre-releases such as v1.3.0-rc.1 only get their exact tag, never :latest).
+# The image is tested first (tests inside the container + smoke test), then built for
+# linux/amd64 and linux/arm64 and pushed with SBOM and provenance attestations; the
+# Docker Hub description is updated from DOCKERHUB.md.
+#
+# Required repository secrets:
+#   DOCKERHUB_USERNAME  – avhulst2
+#   DOCKERHUB_TOKEN     – Docker Hub personal access token (Read & Write; for updating the
+#                         repository description "Read, Write, Delete")
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to (re)publish, e.g. v1.2.3"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: avhulst2/trassd-provenance-lens
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  test:
+    name: Test image
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Check release tag
+        id: version
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Release tag '$TAG' is not a semantic version like v1.2.3 or v1.3.0-rc.1"
+            exit 1
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build image (amd64, for testing)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: trassd-provenance-lens:test
+          build-args: APP_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test image
+        run: ./.github/scripts/test-image.sh trassd-provenance-lens:test
+
+  publish:
+    name: Build & push to Docker Hub
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: docker-hub
+      url: https://hub.docker.com/r/avhulst2/trassd-provenance-lens
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Image tags and labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          # latest=auto: only for releases without a pre-release suffix
+          flavor: latest=auto
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
+            type=semver,pattern={{major}},value=${{ env.TAG }},enable=${{ !startsWith(env.TAG, 'v0.') }}
+          labels: |
+            org.opencontainers.image.title=Trassd Provenance Lens
+            org.opencontainers.image.description=Checks images for machine-readable AI labels (C2PA, IPTC, XMP/EXIF, PNG metadata, invisible watermarks) – EU AI Act Art. 50
+            org.opencontainers.image.vendor=avhulst
+
+      - name: Build and push (amd64 + arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          build-args: APP_VERSION=${{ needs.test.outputs.version }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ env.IMAGE }}
+          short-description: "Checks images for machine-readable AI labels (C2PA, IPTC, EXIF/XMP, watermarks) – EU AI Act Art. 50"
+          readme-filepath: DOCKERHUB.md  # compact; Docker Hub allows max. 25,000 bytes

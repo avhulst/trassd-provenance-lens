@@ -88,10 +88,21 @@ Ambiguous words only match in unambiguous form: "Imagen" only as "Google Imagen"
 
 ## Build & run
 
+Released images are on Docker Hub (`linux/amd64` and `linux/arm64`):
+
 ```bash
-docker build -t ki-pruefer .
-docker run -d --name ki-pruefer -p 8000:8000 ki-pruefer
+docker run -d --name trassd-provenance-lens -p 8000:8000 avhulst2/trassd-provenance-lens:latest
 ```
+
+Or build it yourself:
+
+```bash
+docker build -t trassd-provenance-lens .
+docker run -d --name trassd-provenance-lens -p 8000:8000 trassd-provenance-lens
+```
+
+The examples below use the local name `trassd-provenance-lens`; replace it with
+`avhulst2/trassd-provenance-lens:<version>` to use the published image.
 
 Web UI: <http://localhost:8000/> – upload via drag & drop or file picker, with preview
 and dark mode, in German and English. The **DE | EN** switch in the header stores the
@@ -239,13 +250,13 @@ Local via stdio (adjust the image folder):
 ```json
 {
   "mcpServers": {
-    "ki-pruefer": {
+    "trassd-provenance-lens": {
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
         "-v", "/Users/me/Pictures:/images:ro",
         "-e", "MCP_IMAGE_DIR=/images",
-        "ki-pruefer", "python", "-m", "app.mcp_server"
+        "trassd-provenance-lens", "python", "-m", "app.mcp_server"
       ]
     }
   }
@@ -258,7 +269,7 @@ HTTP and adds the key header):
 ```json
 {
   "mcpServers": {
-    "ki-pruefer": {
+    "trassd-provenance-lens": {
       "command": "npx",
       "args": ["-y", "mcp-remote", "http://localhost:8000/mcp", "--header", "Authorization:${AUTH_HEADER}"],
       "env": { "AUTH_HEADER": "Bearer <your API key>" }
@@ -273,10 +284,10 @@ also has `MCP_IMAGE_DIR` set and the images mounted, e.g. with the project folde
 `images/` (excluded from the image via `.dockerignore`):
 
 ```bash
-docker run -d --name ki-pruefer --restart unless-stopped -p 8000:8000 \
+docker run -d --name trassd-provenance-lens --restart unless-stopped -p 8000:8000 \
   -v "$PWD/secrets/api_key.txt:/run/secrets/api_key:ro" -e API_KEY_FILE=/run/secrets/api_key \
   -v "$PWD/images:/images:ro" -e MCP_IMAGE_DIR=/images \
-  ki-pruefer
+  trassd-provenance-lens
 ```
 
 Images dropped into `images/` are visible immediately, no restart needed.
@@ -284,33 +295,33 @@ Images dropped into `images/` are visible immediately, no restart needed.
 ### Mistral Vibe
 
 In `~/.vibe/config.toml` (or `.vibe/config.toml` in a project; `VIBE_HOME` changes the
-home directory). Tools appear as `ki_pruefer_analyze_image` etc.
+home directory). Tools appear as `trassd_provenance_lens_analyze_image` etc.
 
 Via HTTP against the running container – the key is read from an environment variable:
 
 ```toml
 [[mcp_servers]]
-name = "ki_pruefer"
+name = "trassd_provenance_lens"
 transport = "streamable-http"
 url = "http://localhost:8000/mcp"
-api_key_env = "KI_PRUEFER_API_KEY"
+api_key_env = "TRASSD_PROVENANCE_LENS_API_KEY"
 api_key_header = "Authorization"
 api_key_format = "Bearer {token}"
 ```
 
 ```bash
-export KI_PRUEFER_API_KEY=$(cat secrets/api_key.txt)
+export TRASSD_PROVENANCE_LENS_API_KEY=$(cat secrets/api_key.txt)
 ```
 
 Or locally via stdio with an image folder:
 
 ```toml
 [[mcp_servers]]
-name = "ki_pruefer"
+name = "trassd_provenance_lens"
 transport = "stdio"
 command = "docker"
 args = ["run", "-i", "--rm", "-v", "/Users/me/Pictures:/images:ro", "-e", "MCP_IMAGE_DIR=/images",
-        "ki-pruefer", "python", "-m", "app.mcp_server"]
+        "trassd-provenance-lens", "python", "-m", "app.mcp_server"]
 startup_timeout_sec = 30
 tool_timeout_sec = 120
 ```
@@ -326,11 +337,11 @@ to `MAX_UPLOAD_MB` (plus base64 overhead).
 
 ```bash
 # mount images from the current directory read-only into the container
-docker run --rm -v "$PWD:/images:ro" ki-pruefer \
+docker run --rm -v "$PWD:/images:ro" trassd-provenance-lens \
   python -m app.cli /images/photo.jpg /images/graphic.png
 
 # JSON output (list, one object per image)
-docker run --rm -v "$PWD:/images:ro" ki-pruefer \
+docker run --rm -v "$PWD:/images:ro" trassd-provenance-lens \
   python -m app.cli /images/photo.jpg --json
 ```
 
@@ -358,7 +369,7 @@ Exit codes (e.g. for scripts/CI):
 | `MCP_ALLOWED_HOSTS` | localhost | Allowed `Host` headers for `/mcp` (comma-separated, `*` as port wildcard, `*` alone disables the check) |
 
 ```bash
-docker run -d -p 8000:8000 -e MAX_UPLOAD_MB=20 ki-pruefer
+docker run -d -p 8000:8000 -e MAX_UPLOAD_MB=20 trassd-provenance-lens
 ```
 
 ### Access protection with a key
@@ -369,13 +380,13 @@ Without `API_KEY` the service is open (e.g. for local use). With a key, `/analyz
 ```bash
 # generate a long random key
 export API_KEY=$(openssl rand -hex 32)
-docker run -d --name ki-pruefer -p 8000:8000 -e API_KEY ki-pruefer
+docker run -d --name trassd-provenance-lens -p 8000:8000 -e API_KEY trassd-provenance-lens
 
 # or as a file / Docker secret (the key does not show up in `docker inspect`)
 mkdir -p secrets && (umask 077; openssl rand -hex 32 > secrets/api_key.txt)
-docker run -d --name ki-pruefer --restart unless-stopped -p 8000:8000 \
+docker run -d --name trassd-provenance-lens --restart unless-stopped -p 8000:8000 \
   -v "$PWD/secrets/api_key.txt:/run/secrets/api_key:ro" \
-  -e API_KEY_FILE=/run/secrets/api_key ki-pruefer
+  -e API_KEY_FILE=/run/secrets/api_key trassd-provenance-lens
 ```
 
 - **API:** send the key as header `X-API-Key: …` or `Authorization: Bearer …`. Without a
@@ -401,7 +412,7 @@ docker run -d --name ki-pruefer --restart unless-stopped -p 8000:8000 \
 python3.12 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 pip install --no-deps invisible-watermark==0.2.0
-pip install pytest httpx
+pip install -r requirements-dev.txt
 
 python -m pytest                                # downloads the C2PA test image from GitHub (skipped offline)
 python -m tests.make_test_images test_images    # create test images to try things out
@@ -419,11 +430,60 @@ Test images (`tests/make_test_images.py`, synthetic, 512 × 512):
 | C2PA test image `C.jpg` from `c2pa-python` (`algorithmicMedia`) | `hint` |
 | Unmarked JPEG | `none` |
 
+## CI & releases
+
+- **CI** (`.github/workflows/ci.yml`, every push to `main` and every pull request): unit
+  tests, then the Docker image is built and tested with `.github/scripts/test-image.sh`
+  (test suite inside the container, smoke test of health, API key, `/analyze` and `/mcp`).
+- **Release** (`.github/workflows/release.yml`, when a GitHub release is published): the
+  same image test, then a multi-arch build (`linux/amd64`, `linux/arm64`) pushed to
+  [Docker Hub](https://hub.docker.com/r/avhulst2/trassd-provenance-lens) with SBOM and
+  provenance attestations; the Docker Hub description is updated from `DOCKERHUB.md`.
+- **Dependabot** (`.github/dependabot.yml`): weekly update PRs for Python packages, the
+  base image and GitHub Actions.
+
+Release tags must be semantic versions; the version is taken from the tag (build arg
+`APP_VERSION`, shown by `/health`):
+
+| Release tag | Docker tags |
+|---|---|
+| `v1.2.3` | `1.2.3`, `1.2`, `1`, `latest` |
+| `v1.3.0-rc.1` (pre-release) | `1.3.0-rc.1` only |
+| `v0.4.1` | `0.4.1`, `0.4`, `latest` (no `0` major tag) |
+
+One-time setup in the GitHub repository (Settings → Secrets and variables → Actions):
+
+- `DOCKERHUB_USERNAME` = `avhulst2`
+- `DOCKERHUB_TOKEN` = Docker Hub personal access token (Account settings → Personal
+  access tokens) with **Read, Write, Delete** – "Delete" is required to update the
+  repository description.
+
+Publishing a release:
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+gh release create v1.2.0 --generate-notes      # or via the GitHub web UI
+```
+
+A release created by another workflow with the default `GITHUB_TOKEN` does not trigger
+the release workflow; use a personal token or start it manually (Actions → Release →
+Run workflow, with the tag). The manual run can also re-publish an existing tag.
+
+`DOCKERHUB.md` is the compact description for Docker Hub (limit 25,000 bytes) and links
+to this README; update it when run options or configuration change.
+
 ## Project structure
 
 ```
+├── .github/
+│   ├── workflows/ci.yml       # tests + image test on push / pull request
+│   ├── workflows/release.yml  # GitHub release → Docker Hub (amd64 + arm64)
+│   ├── scripts/test-image.sh  # tests a built image (inside + smoke test)
+│   └── dependabot.yml
 ├── Dockerfile
+├── DOCKERHUB.md               # description shown on Docker Hub
 ├── requirements.txt
+├── requirements-dev.txt
 ├── app/
 │   ├── detectors.py   # all detectors + data model (Finding, Result, analyze)
 │   ├── recommendation.py  # labelling recommendation (ai_generated / ai_modified / ai_assisted)
