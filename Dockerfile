@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Version shown by /health and the API docs; the release workflow passes the git tag.
 ARG APP_VERSION=dev
